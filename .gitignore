@@ -1,0 +1,16 @@
+# Build
+bin/
+obj/
+
+# Visual Studio files
+.vs/
+*.suo
+*.user
+
+# Config files
+**/appsettings.json
+*.db
+*.sqlite
+
+# Others
+.env
