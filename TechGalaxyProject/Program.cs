@@ -21,7 +21,7 @@ builder.Services.AddIdentity<AppUser, IdentityRole>()
                 .AddDefaultTokenProviders();
 
 
-builder.Services.AddCors(options =>
+/*builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowNetlifyApp", policy =>
     {
@@ -30,7 +30,22 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
+});*/
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowDevAndNetlify", policy =>
+    {
+        policy.WithOrigins(
+            "https://main--jolly-gumdrop-7d2a26.netlify.app",
+            "http://localhost:5500",
+            "http://127.0.0.1:5500"
+        )
+        .AllowAnyHeader()
+        .AllowAnyMethod();
+    });
 });
+
 
 
 builder.Services.AddControllers()
@@ -56,7 +71,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseCors("AllowNetlifyApp");
+app.UseCors("AllowDevAndNetlify");
+
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

@@ -20,6 +20,55 @@ namespace TechGalaxyProject.Controllers
         }
         private readonly AppDbContext _db;
 
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetRoadmapDetails(int id)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var roadmap = await _db.roadmaps
+                .Include(r => r.User)
+                .Include(r => r.fields)
+                .ThenInclude(f => f.Resources)
+                .Include(r => r.followedBy)
+                .Include(r => r.fields)
+                .ThenInclude(f => f.completedFields)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (roadmap == null)
+                return NotFound();
+
+            var isFollowed = roadmap.followedBy.Any(f => f.LearnerId == userId);
+
+            var fields = roadmap.fields.Select(f => new FieldDetailsDto
+            {
+                Id = f.Id,
+                Title = f.Title,
+                Description = f.Description,
+                Order = f.Order,
+                Resources = f.Resources.Select(r => r.Link).ToList(),
+                IsCompleted = f.completedFields.Any(cf => cf.LearnerId == userId),
+               
+            }).OrderBy(f => f.Order).ToList();
+
+            var roadmapDto = new RoadmapDetailsDto
+            {
+                Id = roadmap.Id,
+                Title = roadmap.Title,
+                Description = roadmap.Description,
+                Category = roadmap.Category,
+                Tag = roadmap.Tag,
+                DifficultyLevel = roadmap.DifficultyLevel,
+                CoverImageUrl = roadmap.CoverImageUrl,
+                LikesCount = roadmap.LikesCount,
+                CreatedAt = roadmap.CreatedAt,
+                CreatedBy = roadmap.User.UserName,
+                IsFollowed = isFollowed,
+                Fields = fields
+            };
+
+            return Ok(roadmapDto);
+        }
+
         [Authorize]
         [HttpPost("like/{roadmapId}")]
         public async Task<IActionResult> LikeRoadmap(int roadmapId)

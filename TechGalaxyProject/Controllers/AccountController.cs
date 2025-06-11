@@ -49,6 +49,116 @@ namespace TechGalaxyProject.Controllers
             _accountService = accountService;
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetProfile()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var user = await _userManager.FindByIdAsync(userId);
+
+            if (user == null)
+                return NotFound();
+
+            var followedRoadmaps = await _db.FollowedRoadmaps
+                .Include(f => f.Roadmap)
+                .Where(f => f.LearnerId == userId)
+                .Select(f => new FollowedRoadmapDto
+                {
+                    Id = f.RoadmapId,
+                    Title = f.Roadmap.Title,
+                    Category = f.Roadmap.Category
+                })
+                .ToListAsync();
+
+            // إذا كان المستخدم خبيراً
+            if (user.Role == "Expert")
+            {
+                var createdRoadmaps = await _db.roadmaps
+                    .Where(r => r.CreatedBy == userId)
+                    .Select(r => new RoadmapDto
+                    {
+                        Id = r.Id,
+                        Title = r.Title,
+                        Category = r.Category,
+                        DifficultyLevel = r.DifficultyLevel,
+                        CreatedAt = r.CreatedAt
+                    })
+                    .ToListAsync();
+
+                var profile = new UserProfileDto
+                {
+                    Name = user.UserName,
+                    Email = user.Email,
+                    Role = user.Role,
+                    FollowedRoadmaps = followedRoadmaps,
+                    Specialty = user.Specialty,
+                    CertificatePath = user.CertificatePath,
+                    CreatedRoadmaps = createdRoadmaps
+                };
+                return Ok(profile);
+            }
+            else
+            {
+                var profile = new UserProfileDto
+                {
+                    Name = user.UserName,
+                    Email = user.Email,
+                    Role = user.Role,
+                    FollowedRoadmaps = followedRoadmaps
+                };
+                return Ok(profile);
+            }
+        }
+
+        [HttpPut]
+        public async Task<IActionResult> UpdateProfile([FromForm] UpdateProfileDto model)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var user = await _userManager.FindByIdAsync(userId);
+
+            if (user == null)
+                return NotFound();
+
+            if (model.Name != null)
+                user.UserName = model.Name;
+
+            if (model.Email != null)
+            {
+                user.Email = model.Email;
+                await _userManager.UpdateAsync(user);
+            }
+
+            // التحديث فقط للخبراء
+            if (user.Role == "Expert")
+            {
+                if (model.Specialty != null)
+                    user.Specialty = model.Specialty;
+
+                if (model.CertificateFile != null)
+                {
+                    // معالجة ملف الشهادة
+
+                   // حذف الملف القديم إذا كان موجوداً
+                  if (!string.IsNullOrEmpty(user.CertificatePath))
+                    {
+                        await _accountService.DeleteFileAsync(user.CertificatePath);
+                    }
+
+                    // حفظ الملف الجديد
+                    // var newFilePath = await _accountService.SaveFileAsync(model.CertificateFile, "certificates");
+                    var newFilePath = await _accountService.SaveFileAsync(model.CertificateFile, "uploads/certificates");
+
+                    user.CertificatePath = newFilePath;
+                }
+            }
+            else if (model.Specialty != null || model.CertificateFile != null)
+            {
+                return BadRequest("Only experts can update specialty and certificate");
+            }
+
+            await _userManager.UpdateAsync(user);
+            return Ok(new { message = "Profile updated successfully" });
+        }
+
         [HttpPost("Register")]
         public async Task<IActionResult> RegisterNewUser([FromForm] dtoNewUser user)
         {

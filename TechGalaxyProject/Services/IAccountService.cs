@@ -11,6 +11,9 @@ namespace TechGalaxyProject.Services
         Task<(bool Success, string Message)> ResetPasswordAsync(ResetPasswordDto model);
         Task<List<PendingExpertVerificationDto>> GetPendingExpertVerificationsAsync();
         Task<(bool Success, string Message)> ReviewExpertAsync(ExpertReviewDto model);
+        Task<string> SaveFileAsync(IFormFile file, string folderPath);
+        Task<bool> DeleteFileAsync(string filePath);
+        string GetFileUrl(string filePath);
 
 
 

@@ -10,7 +10,7 @@ namespace TechGalaxyProject.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Learner")]
+    //[Authorize(Roles = "Learner")]
     public class CompletedFieldsController : ControllerBase
     {
         private readonly AppDbContext _db;
@@ -19,6 +19,49 @@ namespace TechGalaxyProject.Controllers
         {
             _db = db;
         }
+
+        [HttpPost("{fieldId}/toggle-completed")]
+        public async Task<IActionResult> ToggleCompleted(int fieldId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var field = await _db.fields
+                .Include(f => f.roadmap)
+                .FirstOrDefaultAsync(f => f.Id == fieldId);
+
+            if (field == null)
+                return NotFound();
+
+            // التحقق من أن المستخدم متابع الـ Roadmap
+            var isFollowing = await _db.FollowedRoadmaps
+                .AnyAsync(f => f.RoadmapId == field.RoadmapId && f.LearnerId == userId);
+
+            if (!isFollowing)
+                return BadRequest("You must follow this roadmap to mark fields as completed");
+
+            var existingCompletion = await _db.completedFields
+                .FirstOrDefaultAsync(c => c.FieldId == fieldId && c.LearnerId == userId);
+
+            if (existingCompletion != null)
+            {
+                _db.completedFields.Remove(existingCompletion);
+                await _db.SaveChangesAsync();
+                return Ok(new { completed = false });
+            }
+            else
+            {
+                var completion = new CompletedFields
+                {
+                    FieldId = fieldId,
+                    LearnerId = userId,
+                    CompletedAt = DateTime.Now
+                };
+                _db.completedFields.Add(completion);
+                await _db.SaveChangesAsync();
+                return Ok(new { completed = true });
+            }
+        }
+
         [HttpPost("{fieldId}")]
         public async Task<IActionResult> MarkAsCompleted(int fieldId)
         {

@@ -38,6 +38,50 @@ namespace TechGalaxyProject.Services
             _emailSender = emailSender;
         }
 
+
+        public async Task<string> SaveFileAsync(IFormFile file, string folderPath)
+        {
+            var uploads = Path.Combine(_env.WebRootPath, folderPath);
+            if (!Directory.Exists(uploads))
+            {
+                Directory.CreateDirectory(uploads);
+            }
+
+            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploads, fileName);
+
+            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(fileStream);
+            }
+
+            // إرجاع المسار النسبي
+            var relativePath = Path.Combine(folderPath, fileName);
+            return relativePath.Replace("\\", "/");
+        }
+
+        public async Task<bool> DeleteFileAsync(string filePath)
+        {
+            var fullPath = Path.Combine(_env.WebRootPath, filePath);
+            if (File.Exists(fullPath))
+            {
+                File.Delete(fullPath);
+                return true;
+            }
+            return false;
+        }
+
+        public string GetFileUrl(string filePath)
+        {
+            return $"/{filePath}";
+        }
+
+
+
+
+
+
+
         public async Task<(bool Success, string Message, bool RequiresApproval)> RegisterUserAsync(dtoNewUser user, HttpRequest request)
         {
             if (user.Role != "Expert" && user.Role != "Learner")
@@ -89,6 +133,9 @@ namespace TechGalaxyProject.Services
 
                 var baseUrl = $"{request.Scheme}://{request.Host}";
                 var certificateUrl = $"{baseUrl}/uploads/certificates/{fileName}";
+
+                appUser.CertificatePath = $"uploads/certificates/{fileName}";
+                appUser.Specialty = user.Specialty;
 
                 var verificationRequest = new ExpertVerificationRequest
                 {

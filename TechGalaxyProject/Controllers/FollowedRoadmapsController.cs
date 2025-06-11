@@ -10,7 +10,7 @@ namespace TechGalaxyProject.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Learner")]
+    //[Authorize(Roles = "Learner")]
     public class FollowedRoadmapsController : ControllerBase
     {
         public FollowedRoadmapsController (AppDbContext db)
@@ -18,6 +18,48 @@ namespace TechGalaxyProject.Controllers
             _db = db;
         }
         private readonly AppDbContext _db;
+
+        [HttpPost("{roadmapId}/toggle-follow")]
+        public async Task<IActionResult> ToggleFollow(int roadmapId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var existingFollow = await _db.FollowedRoadmaps
+                .FirstOrDefaultAsync(f => f.RoadmapId == roadmapId && f.LearnerId == userId);
+
+            if (existingFollow != null)
+            {
+                // إلغاء متابعة الـ Roadmap
+                _db.FollowedRoadmaps.Remove(existingFollow);
+
+                // إلغاء علامات الإكمال لجميع fields في هذه الـ Roadmap
+                var fields = await _db.fields
+                    .Where(f => f.RoadmapId == roadmapId)
+                    .Select(f => f.Id)
+                    .ToListAsync();
+
+                var completions = await _db.completedFields
+                    .Where(c => c.LearnerId == userId && fields.Contains(c.FieldId))
+                    .ToListAsync();
+
+                _db.completedFields.RemoveRange(completions);
+
+                await _db.SaveChangesAsync();
+                return Ok(new { followed = false });
+            }
+            else
+            {
+                var follow = new FollowedRoadmap
+                {
+                    RoadmapId = roadmapId,
+                    LearnerId = userId
+                };
+                _db.FollowedRoadmaps.Add(follow);
+                await _db.SaveChangesAsync();
+                return Ok(new { followed = true });
+            }
+        }
+
         [HttpPost("{roadmapId}")]
         public async Task<IActionResult> FollowRoadmap(int roadmapId)
         {
